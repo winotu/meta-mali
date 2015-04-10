@@ -69,3 +69,18 @@ With these modifications done in local.conf, building the image again
 will produce a new SD card image with the Mali GPU drivers enabled:
 
     bitbake core-image-minimal
+
+
+Resizing root filesystem on SD card
+===================================
+
+Root filesystem created on SD card image can be resized using custom
+script called resize-rootfs. To include this script in your build, add
+resize-rootfs to IMAGE_INSTALL_append list in local.conf, e.g.:
+
+    IMAGE_INSTALL_append = "mali-userspace-t62x resize-rootfs"
+
+Script requires invoking twice (once for every step) on the device.
+Step 1 ends with automatic system reboot. Keep in mind this is experimental
+feature and it can destroy all data on the SD card. It should be used
+only during development process.

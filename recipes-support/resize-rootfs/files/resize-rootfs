@@ -1,0 +1,62 @@
+#!/bin/sh
+
+status_file=/etc/resize-status
+root_partition=$(cat /proc/cmdline | tr " " "\n" | grep "root=" | cut -f 2 -d '='| cut -f 3 -d '/')
+root_device="/dev/$(dirname $(readlink /sys/class/block/${root_partition}) | grep -o '[^/]*$')"
+root_part_nr=$(cat /sys/class/block/${root_partition}/partition)
+
+root_part_start=$(parted -s ${root_device} unit MB print | \
+	 awk '/ '${root_part_nr}' / { print substr($2, 1, length($2 -1))}')
+root_part_fs=$(parted -s ${root_device} unit MB print | \
+	awk '/ '${root_part_nr}'  / { print substr($6, 1, length($6))}')
+
+print_prompt() {
+	echo "Script will try to resize the partition ${root_partition} to maxium allowed space."
+	echo "This could cause data loss. Stage $1 operations will now be performed."
+	if [ $1 -eq 1 ]; then
+		echo "Device will automatically reboot afterwards."
+	fi
+	read -p "Do you want to continue? [y/N] " -n 1 REPLY
+	echo ""
+	REPLY=${REPLY:-n}
+	if [ $REPLY != 'y' ]; then
+        	exit 1
+	fi
+}
+
+update_part_table() {
+	echo "Removing partition ${root_partition}..."
+	parted -s "${root_device}" rm "${root_part_nr}" &>/dev/null
+	echo "Recreating partition ${root_partition}..."
+	parted -s "${root_device}" mkpart primary ${root_part_fs} ${root_part_start}M 100% &>/dev/null
+	sync
+}
+
+resize_fs() {
+	echo "Resizing partition ${root_partitiion}..."
+	resize2fs /dev/${root_partition} &>/dev/null
+}
+
+status=$(cat $status_file) || exit 0
+
+case "$status" in
+	untouched)
+		print_prompt 1
+		echo "Stage 1: Resizing the partition."
+		update_part_table
+		echo "part_table_updated" > "$status_file"
+		echo "Device will now reboot."
+		echo "Please rerun the script on next boot to finalize changes."
+		reboot
+		;;
+	part_table_updated)
+		print_prompt 2
+		echo "Stage 2: Resizing the filesystem."
+		resize_fs
+		rm -rf $status_file
+		;;
+	*)
+		echo "Invalid status in $status_file"
+		exit 1
+		;;
+esac
