@@ -43,7 +43,7 @@
 
 inherit kernel
 require recipes-kernel/linux/linux-yocto.inc
-FILESEXTRAPATHS_prepend:= "${THISDIR}/${PN}:"
+FILESEXTRAPATHS_prepend:= "${THISDIR}/${PN}_${PV}:"
 
 LINUX_VERSION ?= "3.10"
 
@@ -61,8 +61,8 @@ SRCBRANCH = "odroidxu3-3.10.y"
 SRCREV = "36898ffe2082ad378f2207555eee0ad22e21381c"
 SRCREV_machine = "${SRCREV}"
 
-PR = "r1"
-PV = "${LINUX_VERSION}+git${SRCPV}"
+PR = "69"
+PV = "${LINUX_VERSION}"
 
 COMPATIBLE_MACHINE = "(odroidxu3)"
 
