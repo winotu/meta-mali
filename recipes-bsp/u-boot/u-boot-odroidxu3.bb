@@ -1,4 +1,4 @@
-include include/uboot-mali.inc
+include include/u-boot-mali.inc
 
 PROVIDES += "u-boot"
 
