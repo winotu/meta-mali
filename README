@@ -2,8 +2,27 @@ ARM Mali BSP layer
 ==================
 
 These recipes provide a BSP layer for ARM development platforms with
-ARM Mali technology enabled.  To build a minimal Poky image for
-ODROID-XU3 which features a Mali-T62x GPU.
+ARM Mali technology enabled.  To build a minimal image using
+OpenEmbedded (OE) or Yocto/Poky for ODROID-XU3 which features a
+Mali-T62x GPU:
+
+OpenEmbedded set-up
+-------------------
+
+* Get OE meta-data with:
+    git clone -b daisy git://git.openembedded.org/openembedded-core
+
+* Prepare the build environment:
+    cd openembedded-core && \
+    git clone -b 1.26 git://git.openembedded.org/bitbake && \
+    source oe-init-build-env
+
+* Add path to meta-mali in openembedded-core/build/conf/bblayers.conf
+
+* Set MACHINE to odroidxu3 in openembedded-core/build/conf/local.conf
+
+Yocto/Poky set-up
+-----------------
 
 * Get Poky meta-data with:
     git clone -b daisy git://git.yoctoproject.org/poky.git
@@ -15,7 +34,13 @@ ODROID-XU3 which features a Mali-T62x GPU.
 
 * Set MACHINE to odroidxu3 in poky/build/conf/local.conf
 
-* Build a basic image with:
+Building
+--------
+
+Once you've initialised your build environment for either OE or Poky,
+the commands to build a full image are the same in both cases.
+
+* Run this command to build a basic image:
     bitbake core-image-minimal
 
 * If you get this error:
@@ -57,7 +82,7 @@ enable the recipes, add this line to local.conf:
 
 Because the Mali recipes provide EGL and OpenGL ES but not OpenGL,
 there is a conflict with the Mesa recipes which are needed for X11 and
-Wayland.  So the current Mali GPU support in Yocto does not work with
+Wayland.  So the current Mali GPU support in OE does not work with
 windowing systems but only "directfb" mode (a.k.a "fbdev").  The
 core-image-minimal includes X11, so to convert it to "directfb" you
 will also need to add these two lines to local.conf:
