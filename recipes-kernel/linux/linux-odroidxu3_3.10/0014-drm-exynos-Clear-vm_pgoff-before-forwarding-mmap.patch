@@ -1,0 +1,28 @@
+From b3e95192952ef82cf991e592d94f1284ca54bd98 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?=C3=98rjan=20Eide?= <orjan.eide@arm.com>
+Date: Thu, 12 Mar 2015 14:42:55 +0100
+Subject: [PATCH 14/20] drm/exynos: Clear vm_pgoff before forwarding mmap
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Signed-off-by: Ørjan Eide <orjan.eide@arm.com>
+---
+ drivers/gpu/drm/exynos/exynos_drm_gem.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/gpu/drm/exynos/exynos_drm_gem.c b/drivers/gpu/drm/exynos/exynos_drm_gem.c
+index 163a054..4ad2dc3 100644
+--- a/drivers/gpu/drm/exynos/exynos_drm_gem.c
++++ b/drivers/gpu/drm/exynos/exynos_drm_gem.c
+@@ -368,6 +368,7 @@ int exynos_drm_gem_mmap_buffer(struct file *filp,
+ 	if (vm_size > buffer->size)
+ 		return -EINVAL;
+ 
++	vma->vm_pgoff = 0;
+ 	ret = dma_mmap_attrs(drm_dev->dev, vma, buffer->pages,
+ 				buffer->dma_addr, buffer->size,
+ 				&buffer->dma_attrs);
+-- 
+1.9.1
+

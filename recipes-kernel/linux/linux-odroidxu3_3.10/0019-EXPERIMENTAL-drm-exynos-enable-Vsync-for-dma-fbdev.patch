@@ -1,0 +1,115 @@
+From 0e8ec39fe458cbd5b6902cddba0421d4e34021e7 Mon Sep 17 00:00:00 2001
+From: Grzegorz Prajsner <grzegorz.prajsner@arm.com>
+Date: Fri, 4 Sep 2015 17:26:01 +0100
+Subject: [PATCH 19/20] [EXPERIMENTAL] drm/exynos: enable Vsync for dma-fbdev
+
+Fix Vsync interrupt handling in exynos_mixer.c and enable Vsync when
+mali-userspace drivers with dma-buf support are used. Mali driver
+uses FBIOPAN_DISPLAY to switch between buffers when dma-buf support
+is enabled. This patch adds wait_for_vblank call to panning function.
+This caps FPS to refresh rate of the display and reduces tearing in the
+rendered graphics.
+
+This behaviour is enabled by CONFIG_DRM_EXYNOS_EXPERIMENTAL_VSYNC.
+
+Signed-off-by: Guillaume Tucker <guillaume.tucker@arm.com>
+---
+ drivers/gpu/drm/exynos/Kconfig            |  7 +++++++
+ drivers/gpu/drm/exynos/exynos_drm_fbdev.c | 16 ++++++++++++++++
+ drivers/gpu/drm/exynos/exynos_mixer.c     | 12 ++++++++++++
+ 3 files changed, 35 insertions(+)
+
+diff --git a/drivers/gpu/drm/exynos/Kconfig b/drivers/gpu/drm/exynos/Kconfig
+index ac88d743..224a12e 100644
+--- a/drivers/gpu/drm/exynos/Kconfig
++++ b/drivers/gpu/drm/exynos/Kconfig
+@@ -80,6 +80,13 @@ config DRM_EXYNOS_IPP
+ 	help
+ 	  Choose this option if you want to use IPP feature for DRM.
+ 
++config DRM_EXYNOS_EXPERIMENTAL_VSYNC
++	bool "Exynos DRM experimental Vsync"
++	depends on DRM_EXYNOS
++	help
++	  Choose this option if you want to use EXPERIMENTAL vsync
++	  implementation for Exynos DRM driver.
++
+ config DRM_EXYNOS_FIMC
+ 	bool "Exynos DRM FIMC"
+ 	depends on DRM_EXYNOS_IPP && MFD_SYSCON
+diff --git a/drivers/gpu/drm/exynos/exynos_drm_fbdev.c b/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
+index c6eb664..2052e13 100644
+--- a/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
++++ b/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
+@@ -66,6 +66,18 @@ static int exynos_drm_fb_mmap(struct fb_info *info,
+ 	return 0;
+ }
+ 
++#if IS_ENABLED(CONFIG_DRM_EXYNOS_EXPERIMENTAL_VSYNC)
++static int exynos_drm_pan_display(struct fb_var_screeninfo *var, struct fb_info *info)
++{
++	extern struct exynos_drm_manager mixer_manager;
++	int ret = drm_fb_helper_pan_display(var, info);
++
++	mixer_manager.ops->wait_for_vblank(&mixer_manager);
++
++	return ret;
++}
++#endif
++
+ static struct dma_buf *exynos_fb_get_dma_buf(struct fb_info *info)
+ {
+ 	struct dma_buf *buf = NULL;
+@@ -93,7 +105,11 @@ static struct fb_ops exynos_drm_fb_ops = {
+ 	.fb_check_var		= drm_fb_helper_check_var,
+ 	.fb_set_par		= drm_fb_helper_set_par,
+ 	.fb_blank		= drm_fb_helper_blank,
++#if IS_ENABLED(CONFIG_DRM_EXYNOS_EXPERIMENTAL_VSYNC)
++	.fb_pan_display		= exynos_drm_pan_display,
++#else
+ 	.fb_pan_display		= drm_fb_helper_pan_display,
++#endif
+ 	.fb_setcmap		= drm_fb_helper_setcmap,
+ 	.fb_dmabuf_export	= exynos_fb_get_dma_buf,
+ };
+diff --git a/drivers/gpu/drm/exynos/exynos_mixer.c b/drivers/gpu/drm/exynos/exynos_mixer.c
+index 126cf81..72c65b5 100644
+--- a/drivers/gpu/drm/exynos/exynos_mixer.c
++++ b/drivers/gpu/drm/exynos/exynos_mixer.c
+@@ -1010,6 +1010,10 @@ static void mixer_wait_for_vblank(struct exynos_drm_manager *mgr)
+ 	}
+ 	mutex_unlock(&mixer_ctx->mixer_mutex);
+ 
++#if IS_ENABLED(CONFIG_DRM_EXYNOS_EXPERIMENTAL_VSYNC)
++	drm_vblank_get(mgr->crtc->dev, mixer_ctx->pipe);
++#endif
++
+ 	atomic_set(&mixer_ctx->wait_vsync_event, 1);
+ 
+ 	/*
+@@ -1020,6 +1024,10 @@ static void mixer_wait_for_vblank(struct exynos_drm_manager *mgr)
+ 				!atomic_read(&mixer_ctx->wait_vsync_event),
+ 				HZ/20))
+ 		DRM_DEBUG_KMS("vblank wait timed out.\n");
++
++#if IS_ENABLED(CONFIG_DRM_EXYNOS_EXPERIMENTAL_VSYNC)
++	drm_vblank_put(mgr->crtc->dev, mixer_ctx->pipe);
++#endif
+ }
+ 
+ static void mixer_window_suspend(struct exynos_drm_manager *mgr)
+@@ -1156,7 +1164,11 @@ static struct exynos_drm_manager_ops mixer_manager_ops = {
+ 	.win_disable		= mixer_win_disable,
+ };
+ 
++#if IS_ENABLED(CONFIG_DRM_EXYNOS_EXPERIMENTAL_VSYNC)
++struct exynos_drm_manager mixer_manager = {
++#else
+ static struct exynos_drm_manager mixer_manager = {
++#endif
+ 	.type			= EXYNOS_DISPLAY_TYPE_HDMI,
+ 	.ops			= &mixer_manager_ops,
+ };
+-- 
+1.9.1
+

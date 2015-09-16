@@ -56,6 +56,19 @@ SRC_URI = " \
 	file://0005-ARM-odroidxu3-enable-CONFIG_PROFILING.patch \
 	file://0006-ARM-odroidxu3_defconfig-enable-Mali-Gator-support.patch \
 	file://0007-MALI-add-gpuinfo-sysfs-entry.patch \
+	file://0008-ARM-drm-exynos-re-enable-support-for-triple-bufferin.patch \
+	file://0009-ARM-drm-exynos-take-a-reference-to-the-DMA-buf.patch \
+	file://0010-DRM-EXYNOS-Add-dma_buf-mmap-support.patch \
+	file://0011-CHROMIUM-drm-exynos-dmabuf-Use-dma_mmap_attrs-to-mma.patch \
+	file://0012-drivers-gpu-arm-midgard-update-to-r6p0-02rel0.patch \
+	file://0013-drivers-gpu-arm-midgard-fix-5422-platform-files-for-.patch \
+	file://0014-drm-exynos-Clear-vm_pgoff-before-forwarding-mmap.patch \
+	file://0015-ARM-DMA-Use-vm_pgoff-for-IOMMU-mmap.patch \
+	file://0016-drm-exynos-fix-formating-in-some-functions.patch \
+	file://0017-fbdev-add-dma-buf-support.patch \
+	file://0018-drm-exynos-switch-to-using-standard-fb-ioctl.patch \
+	file://0019-EXPERIMENTAL-drm-exynos-enable-Vsync-for-dma-fbdev.patch \
+	file://0020-drm-exynos-fix-fbdev-triple-buffering-support.patch \
 "
 SRCBRANCH = "odroidxu3-3.10.y"
 SRCREV = "36898ffe2082ad378f2207555eee0ad22e21381c"

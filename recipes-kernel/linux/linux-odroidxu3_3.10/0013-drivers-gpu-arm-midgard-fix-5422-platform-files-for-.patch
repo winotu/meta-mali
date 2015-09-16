@@ -1,0 +1,348 @@
+From 6e5641cde3401b4f0b101c5dc6977549bd37025d Mon Sep 17 00:00:00 2001
+From: Grzegorz Prajsner <grzegorz.prajsner@arm.com>
+Date: Wed, 15 Jul 2015 15:53:00 +0100
+Subject: [PATCH 13/20] drivers/gpu/arm/midgard: fix 5422 platform files for
+ r6p0
+
+Fix the build for Exynos 5422 platform files in Mali Midgard
+driver, to match the changes in the platform API since r5p0.
+
+Signed-off-by: Guillaume Tucker <guillaume.tucker@arm.com>
+---
+ .../gpu/arm/midgard/platform/5422/gpu_control.c    | 20 +++---
+ .../arm/midgard/platform/5422/gpu_dvfs_handler.c   | 34 +++++-----
+ .../gpu/arm/midgard/platform/5422/gpu_notifier.c   | 14 ++--
+ .../platform/5422/mali_kbase_config_platform.h     | 10 +++
+ .../midgard/platform/5422/mali_kbase_platform.c    | 77 +++++++---------------
+ .../midgard/platform/5422/mali_kbase_platform.h    |  2 -
+ 6 files changed, 70 insertions(+), 87 deletions(-)
+
+diff --git a/drivers/gpu/arm/midgard/platform/5422/gpu_control.c b/drivers/gpu/arm/midgard/platform/5422/gpu_control.c
+index af5c882..85e9342 100644
+--- a/drivers/gpu/arm/midgard/platform/5422/gpu_control.c
++++ b/drivers/gpu/arm/midgard/platform/5422/gpu_control.c
+@@ -47,22 +47,22 @@ int gpu_control_state_set(struct kbase_device *kbdev, gpu_control_state state, i
+ 	case GPU_CONTROL_CLOCK_ON:
+ 		ret = gpu_clock_on(platform);
+ #ifdef CONFIG_MALI_MIDGARD_DVFS
+-		if (!kbdev->pm.metrics.timer_active) {
+-			spin_lock_irqsave(&kbdev->pm.metrics.lock, flags);
+-			kbdev->pm.metrics.timer_active = true;
+-			spin_unlock_irqrestore(&kbdev->pm.metrics.lock, flags);
+-			hrtimer_start(&kbdev->pm.metrics.timer, HR_TIMER_DELAY_MSEC(platform->polling_speed), HRTIMER_MODE_REL);
++		if (!kbdev->pm.backend.metrics.timer_active) {
++			spin_lock_irqsave(&kbdev->pm.backend.metrics.lock, flags);
++			kbdev->pm.backend.metrics.timer_active = true;
++			spin_unlock_irqrestore(&kbdev->pm.backend.metrics.lock, flags);
++			hrtimer_start(&kbdev->pm.backend.metrics.timer, HR_TIMER_DELAY_MSEC(platform->polling_speed), HRTIMER_MODE_REL);
+ 		}
+ 		gpu_dvfs_handler_control(kbdev, GPU_HANDLER_UPDATE_TIME_IN_STATE, 0);
+ #endif /* CONFIG_MALI_MIDGARD_DVFS */
+ 		break;
+ 	case GPU_CONTROL_CLOCK_OFF:
+ #ifdef CONFIG_MALI_MIDGARD_DVFS
+-		if (platform->dvfs_status && kbdev->pm.metrics.timer_active) {
+-			spin_lock_irqsave(&kbdev->pm.metrics.lock, flags);
+-			kbdev->pm.metrics.timer_active = false;
+-			spin_unlock_irqrestore(&kbdev->pm.metrics.lock, flags);
+-			hrtimer_cancel(&kbdev->pm.metrics.timer);
++		if (platform->dvfs_status && kbdev->pm.backend.metrics.timer_active) {
++			spin_lock_irqsave(&kbdev->pm.backend.metrics.lock, flags);
++			kbdev->pm.backend.metrics.timer_active = false;
++			spin_unlock_irqrestore(&kbdev->pm.backend.metrics.lock, flags);
++			hrtimer_cancel(&kbdev->pm.backend.metrics.timer);
+ 		}
+ 		gpu_pm_qos_command(platform, GPU_CONTROL_PM_QOS_RESET);
+ 		gpu_dvfs_handler_control(kbdev, GPU_HANDLER_UPDATE_TIME_IN_STATE, platform->cur_clock);
+diff --git a/drivers/gpu/arm/midgard/platform/5422/gpu_dvfs_handler.c b/drivers/gpu/arm/midgard/platform/5422/gpu_dvfs_handler.c
+index bf25058..a898209 100644
+--- a/drivers/gpu/arm/midgard/platform/5422/gpu_dvfs_handler.c
++++ b/drivers/gpu/arm/midgard/platform/5422/gpu_dvfs_handler.c
+@@ -124,11 +124,11 @@ int kbase_platform_dvfs_event(struct kbase_device *kbdev, u32 utilisation,
+ #ifdef CONFIG_CPU_THERMAL_IPA
+ 	if (platform->time_tick < GPU_DVFS_TIME_INTERVAL) {
+ 		platform->time_tick++;
+-		platform->time_busy += kbdev->pm.metrics.time_busy;
+-		platform->time_idle += kbdev->pm.metrics.time_idle;
++		platform->time_busy += kbdev->pm.backend.metrics.time_busy;
++		platform->time_idle += kbdev->pm.backend.metrics.time_idle;
+ 	} else {
+-		platform->time_busy = kbdev->pm.metrics.time_busy;
+-		platform->time_idle = kbdev->pm.metrics.time_idle;
++		platform->time_busy = kbdev->pm.backend.metrics.time_busy;
++		platform->time_idle = kbdev->pm.backend.metrics.time_idle;
+ 		platform->time_tick = 0;
+ 	}
+ #endif /* CONFIG_CPU_THERMAL_IPA */
+@@ -141,9 +141,9 @@ int kbase_platform_dvfs_event(struct kbase_device *kbdev, u32 utilisation,
+ #endif /* CONFIG_MALI_MIDGARD_DVFS */
+ 
+ #if defined(SLSI_INTEGRATION) && defined(CL_UTILIZATION_BOOST_BY_TIME_WEIGHT)
+-	atomic_set(&kbdev->pm.metrics.time_compute_jobs, 0);
+-	atomic_set(&kbdev->pm.metrics.time_vertex_jobs, 0);
+-	atomic_set(&kbdev->pm.metrics.time_fragment_jobs, 0);
++	atomic_set(&kbdev->pm.backend.metrics.time_compute_jobs, 0);
++	atomic_set(&kbdev->pm.backend.metrics.time_vertex_jobs, 0);
++	atomic_set(&kbdev->pm.backend.metrics.time_fragment_jobs, 0);
+ #endif
+ 
+ 	if (platform->dvfs_wq)
+@@ -208,21 +208,21 @@ static int gpu_dvfs_on_off(struct kbase_device *kbdev, bool enable)
+ 		platform->dvfs_status = true;
+ 		gpu_control_state_set(kbdev, GPU_CONTROL_CHANGE_CLK_VOL, platform->cur_clock);
+ 		gpu_dvfs_handler_init(kbdev);
+-		if (!kbdev->pm.metrics.timer_active) {
+-			spin_lock_irqsave(&kbdev->pm.metrics.lock, flags);
+-			kbdev->pm.metrics.timer_active = true;
+-			spin_unlock_irqrestore(&kbdev->pm.metrics.lock, flags);
+-			hrtimer_start(&kbdev->pm.metrics.timer, HR_TIMER_DELAY_MSEC(platform->polling_speed), HRTIMER_MODE_REL);
++		if (!kbdev->pm.backend.metrics.timer_active) {
++			spin_lock_irqsave(&kbdev->pm.backend.metrics.lock, flags);
++			kbdev->pm.backend.metrics.timer_active = true;
++			spin_unlock_irqrestore(&kbdev->pm.backend.metrics.lock, flags);
++			hrtimer_start(&kbdev->pm.backend.metrics.timer, HR_TIMER_DELAY_MSEC(platform->polling_speed), HRTIMER_MODE_REL);
+ 		}
+ 	} else if (!enable && platform->dvfs_status) {
+ 		platform->dvfs_status = false;
+ 		gpu_dvfs_handler_deinit(kbdev);
+ 		gpu_control_state_set(kbdev, GPU_CONTROL_CHANGE_CLK_VOL, MALI_DVFS_BL_CONFIG_FREQ);
+-		if (kbdev->pm.metrics.timer_active) {
+-			spin_lock_irqsave(&kbdev->pm.metrics.lock, flags);
+-			kbdev->pm.metrics.timer_active = false;
+-			spin_unlock_irqrestore(&kbdev->pm.metrics.lock, flags);
+-			hrtimer_cancel(&kbdev->pm.metrics.timer);
++		if (kbdev->pm.backend.metrics.timer_active) {
++			spin_lock_irqsave(&kbdev->pm.backend.metrics.lock, flags);
++			kbdev->pm.backend.metrics.timer_active = false;
++			spin_unlock_irqrestore(&kbdev->pm.backend.metrics.lock, flags);
++			hrtimer_cancel(&kbdev->pm.backend.metrics.timer);
+ 		}
+ 	} else {
+ 		GPU_LOG(DVFS_WARNING, "impossible state to change dvfs status (current: %d, request: %d)\n",
+diff --git a/drivers/gpu/arm/midgard/platform/5422/gpu_notifier.c b/drivers/gpu/arm/midgard/platform/5422/gpu_notifier.c
+index a4d71e9..0df4c6a 100644
+--- a/drivers/gpu/arm/midgard/platform/5422/gpu_notifier.c
++++ b/drivers/gpu/arm/midgard/platform/5422/gpu_notifier.c
+@@ -147,10 +147,10 @@ static struct notifier_block gpu_pm_nb = {
+ 	.notifier_call = gpu_pm_notifier
+ };
+ 
+-static mali_error gpu_device_runtime_init(struct kbase_device *kbdev)
++static int gpu_device_runtime_init(struct kbase_device *kbdev)
+ {
+ 	pm_suspend_ignore_children(kbdev->dev, true);
+-	return MALI_ERROR_NONE;
++	return 0;
+ }
+ 
+ static void gpu_device_runtime_disable(struct kbase_device *kbdev)
+@@ -181,7 +181,7 @@ static void pm_callback_runtime_off(struct kbase_device *kbdev)
+ 	gpu_control_state_set(kbdev, GPU_CONTROL_CLOCK_OFF, 0);
+ }
+ 
+-kbase_pm_callback_conf pm_callbacks = {
++struct kbase_pm_callback_conf pm_callbacks = {
+ 	.power_on_callback = gpu_power_on,
+ 	.power_off_callback = gpu_power_off,
+ #ifdef CONFIG_PM_RUNTIME
+@@ -200,6 +200,7 @@ kbase_pm_callback_conf pm_callbacks = {
+ 
+ int gpu_notifier_init(struct kbase_device *kbdev)
+ {
++	int stat;
+ 	struct exynos_context *platform = (struct exynos_context *)kbdev->platform_context;
+ 	if (!platform)
+ 		return -ENODEV;
+@@ -213,13 +214,14 @@ int gpu_notifier_init(struct kbase_device *kbdev)
+ #endif /* CONFIG_EXYNOS_THERMAL */
+ 
+ #ifdef CONFIG_MALI_MIDGARD_RT_PM
+-	if (register_pm_notifier(&gpu_pm_nb))
+-		return MALI_FALSE;
++	stat = register_pm_notifier(&gpu_pm_nb);
++	if (stat)
++		return stat;
+ #endif /* CONFIG_MALI_MIDGARD_RT_PM */
+ 
+ 	pm_runtime_enable(kbdev->dev);
+ 
+-	return MALI_TRUE;
++	return 0;
+ }
+ 
+ void gpu_notifier_term(void)
+diff --git a/drivers/gpu/arm/midgard/platform/5422/mali_kbase_config_platform.h b/drivers/gpu/arm/midgard/platform/5422/mali_kbase_config_platform.h
+index 0c06cba..ed4accf 100644
+--- a/drivers/gpu/arm/midgard/platform/5422/mali_kbase_config_platform.h
++++ b/drivers/gpu/arm/midgard/platform/5422/mali_kbase_config_platform.h
+@@ -8,6 +8,7 @@
+  * it under the terms of the GNU General Public License version 2 as
+  * published by the Free Software FoundatIon.
+  */
++#include <mali_kbase_config.h>
+ 
+ #define SOC_NAME 5422
+ 
+@@ -27,3 +28,12 @@
+ #else
+ #error SOC_NAME should be specified.
+ #endif /* SOC_NAME */
++
++extern int get_cpu_clock_speed(u32 *cpu_clock);
++extern struct kbase_platform_funcs_conf platform_funcs;
++extern struct kbase_pm_callback_conf pm_callbacks;
++
++#define CPU_SPEED_FUNC (&get_cpu_clock_speed)
++#define GPU_SPEED_FUNC (NULL)
++#define PLATFORM_FUNCS (&platform_funcs)
++#define POWER_MANAGEMENT_CALLBACKS (&pm_callbacks)
+diff --git a/drivers/gpu/arm/midgard/platform/5422/mali_kbase_platform.c b/drivers/gpu/arm/midgard/platform/5422/mali_kbase_platform.c
+index 0691e90..52bdf39 100644
+--- a/drivers/gpu/arm/midgard/platform/5422/mali_kbase_platform.c
++++ b/drivers/gpu/arm/midgard/platform/5422/mali_kbase_platform.c
+@@ -42,21 +42,21 @@ int gpu_get_debug_level(void)
+ /**
+  ** Exynos5 hardware specific initialization
+  **/
+-static mali_bool kbase_platform_exynos5_init(struct kbase_device *kbdev)
++int kbase_platform_exynos5_init(struct kbase_device *kbdev)
+ {
+ #ifdef CONFIG_MALI_MIDGARD_DVFS
+ 	unsigned long flags;
+ #endif /* CONFIG_MALI_MIDGARD_DVFS */
+ 	struct exynos_context *platform;
++	int stat;
+ 
+ 	platform = kmalloc(sizeof(struct exynos_context), GFP_KERNEL);
+-
+-	if (NULL == platform)
+-		return MALI_FALSE;
++	if (!platform)
++		return -ENOMEM;
+ 
+ 	memset(platform, 0, sizeof(struct exynos_context));
+ 
+-	kbdev->platform_context = (void *) platform;
++	kbdev->platform_context = platform;
+ 
+ 	platform->cmu_pmu_status = 0;
+ 	platform->dvfs_wq = NULL;
+@@ -68,7 +68,8 @@ static mali_bool kbase_platform_exynos5_init(struct kbase_device *kbdev)
+ 	spin_lock_init(&platform->gpu_dvfs_spinlock);
+ 
+ 	/* gpu control module init*/
+-	if (gpu_control_module_init(kbdev))
++	stat = gpu_control_module_init(kbdev);
++	if (stat)
+ 		goto clock_init_fail;
+ 
+ 	/* dvfs gobernor init*/
+@@ -81,15 +82,17 @@ static mali_bool kbase_platform_exynos5_init(struct kbase_device *kbdev)
+ 	/* dvfs handler init*/
+ 	gpu_dvfs_handler_init(kbdev);
+ 
+-	if (!gpu_notifier_init(kbdev))
++	stat = gpu_notifier_init(kbdev);
++	if (stat)
+ 		goto notifier_init_fail;
+ 
+ #ifdef CONFIG_MALI_MIDGARD_DEBUG_SYS
+-	if (gpu_create_sysfs_file(kbdev->dev))
++	stat = gpu_create_sysfs_file(kbdev->dev);
++	if (stat)
+ 		goto sysfs_init_fail;
+ #endif /* CONFIG_MALI_MIDGARD_DEBUG_SYS */
+ 
+-	return MALI_TRUE;
++	return 0;
+ 
+ clock_init_fail:
+ notifier_init_fail:
+@@ -98,7 +101,7 @@ sysfs_init_fail:
+ #endif /* CONFIG_MALI_MIDGARD_DEBUG_SYS */
+ 	kfree(platform);
+ 
+-	return MALI_FALSE;
++	return stat;
+ }
+ 
+ /**
+@@ -125,52 +128,22 @@ static void kbase_platform_exynos5_term(struct kbase_device *kbdev)
+ #endif /* CONFIG_MALI_MIDGARD_DEBUG_SYS */
+ }
+ 
+-kbase_platform_funcs_conf platform_funcs = {
++struct kbase_platform_funcs_conf platform_funcs = {
+ 	.platform_init_func = &kbase_platform_exynos5_init,
+ 	.platform_term_func = &kbase_platform_exynos5_term,
+ };
+ 
+-extern kbase_pm_callback_conf pm_callbacks;
+-extern int get_cpu_clock_speed(u32 *cpu_clock);
+-
+-static kbase_attribute config_attributes[] = {
+-#ifdef CONFIG_MALI_MIDGARD_RT_PM
+-	{
+-		KBASE_CONFIG_ATTR_POWER_MANAGEMENT_CALLBACKS,
+-		(uintptr_t)&pm_callbacks
+-	},
+-#endif /* CONFIG_MALI_MIDGARD_RT_PM */
+-	{
+-		KBASE_CONFIG_ATTR_POWER_MANAGEMENT_DVFS_FREQ,
+-		100
+-	}, /* 100ms */
+-	{
+-		KBASE_CONFIG_ATTR_PLATFORM_FUNCS,
+-		(uintptr_t)&platform_funcs
+-	},
+-	{
+-		KBASE_CONFIG_ATTR_JS_RESET_TIMEOUT_MS,
+-		500 /* 500ms before cancelling stuck jobs */
+-	},
+-	{
+-		KBASE_CONFIG_ATTR_CPU_SPEED_FUNC,
+-		(uintptr_t)&get_cpu_clock_speed
+-	},
+-	{
+-		KBASE_CONFIG_ATTR_END,
+-		0
+-	}
+-};
+-
+-kbase_platform_config platform_config = {
+-		.attributes                = config_attributes,
+-};
++int kbase_platform_early_init(void)
++{
++	/* Nothing needed at this stage */
++	return 0;
++}
+ 
+-kbase_platform_config platform_config;
+-kbase_platform_config e5422_platform_config;
++struct kbase_platform_config e5422_platform_config;
+ 
+-kbase_platform_config *kbase_get_platform_config(void) {
+-                e5422_platform_config.attributes = config_attributes;
+-                return &e5422_platform_config;
+- 
++struct kbase_platform_config *kbase_get_platform_config(void) {
++	return &e5422_platform_config;
+ }
++
++extern struct kbase_pm_callback_conf pm_callbacks;
++extern int get_cpu_clock_speed(u32 *cpu_clock);
+diff --git a/drivers/gpu/arm/midgard/platform/5422/mali_kbase_platform.h b/drivers/gpu/arm/midgard/platform/5422/mali_kbase_platform.h
+index 4f8ed05..55fc8aa 100644
+--- a/drivers/gpu/arm/midgard/platform/5422/mali_kbase_platform.h
++++ b/drivers/gpu/arm/midgard/platform/5422/mali_kbase_platform.h
+@@ -153,6 +153,4 @@ struct mali_debug_utilisation_stats
+ void gpu_set_debug_level(int level);
+ int gpu_get_debug_level(void);
+ 
+-int kbase_platform_early_init(struct platform_device *pdev);
+-
+ #endif /* _GPU_PLATFORM_H_ */
+-- 
+1.9.1
+

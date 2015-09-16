@@ -1,0 +1,31 @@
+From e6df4619164a17538fef66237ae34c40b9e17583 Mon Sep 17 00:00:00 2001
+From: Grzegorz Prajsner <grzpra@gmx.com>
+Date: Mon, 31 Aug 2015 14:27:29 +0200
+Subject: [PATCH 20/20] drm/exynos: fix fbdev triple buffering support
+
+Fix triple buffering support on Exynos DRM framebuffer. The size
+of the framebuffer should now be correctly set, previously it was
+3 times too big, which caused problems while writing directly to
+/dev/fb0.
+
+Signed-off-by: Guillaume Tucker <guillaume.tucker@arm.com>
+---
+ drivers/gpu/drm/exynos/exynos_drm_fbdev.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/gpu/drm/exynos/exynos_drm_fbdev.c b/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
+index 2052e13..cf08b85 100644
+--- a/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
++++ b/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
+@@ -120,7 +120,7 @@ static int exynos_drm_fbdev_update(struct drm_fb_helper *helper,
+ 	struct fb_info *fbi = helper->fbdev;
+ 	struct drm_device *dev = helper->dev;
+ 	struct exynos_drm_gem_buf *buffer;
+-	unsigned int size = fb->width * fb->height * (fb->bits_per_pixel >> 3) * NUM_BUFFERS;
++	unsigned int size = fb->width * fb->height * (fb->bits_per_pixel >> 3);
+ 	unsigned long offset;
+ 
+ 	drm_fb_helper_fill_fix(fbi, fb->pitches[0], fb->depth);
+-- 
+1.9.1
+

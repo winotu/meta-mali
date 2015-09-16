@@ -1,0 +1,33 @@
+From 0f2e648a457fa7a4711ba9dc3d38159f419367c5 Mon Sep 17 00:00:00 2001
+From: Grzegorz Prajsner <grzegorz.prajsner@arm.com>
+Date: Wed, 22 Apr 2015 14:18:19 +0100
+Subject: [PATCH 09/20] ARM: drm/exynos: take a reference to the DMA buf
+
+The patch implementing the dma_buf on exynos devices does not take
+reference to the buffer, when buffer handle is obtained. This causes
+issues when buffer is released.
+
+Signed-off-by: Guillaume Tucker <guillaume.tucker@arm.com>
+---
+ drivers/gpu/drm/exynos/exynos_drm_fbdev.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/gpu/drm/exynos/exynos_drm_fbdev.c b/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
+index c206481..d28fd9f 100644
+--- a/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
++++ b/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
+@@ -77,8 +77,10 @@ static u32 exynos_fb_get_dma_buf( struct fb_info *info)
+     {
+         struct dma_buf *buf = NULL;
+         buf = dev->driver->gem_prime_export( dev, &exynos_gem_obj->base, O_RDWR);
+-        if(buf)
++        if(buf) {
+             fd = dma_buf_fd(buf, O_RDWR);
++            drm_gem_object_reference(&exynos_gem_obj->base);
++        }
+     }
+ 
+     return fd;
+-- 
+1.9.1
+

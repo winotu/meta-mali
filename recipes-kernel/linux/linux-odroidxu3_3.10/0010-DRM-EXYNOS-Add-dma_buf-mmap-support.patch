@@ -1,0 +1,50 @@
+From fb63841b1c6d739e3ba7822f09c00fae09569f5e Mon Sep 17 00:00:00 2001
+From: David Garbett <David.Garbett@arm.com>
+Date: Wed, 29 May 2013 14:07:24 -0700
+Subject: [PATCH 10/20] DRM: EXYNOS: Add dma_buf mmap support
+
+Signed-off-by: Guillaume Tucker <guillaume.tucker@arm.com>
+---
+ drivers/gpu/drm/exynos/exynos_drm_dmabuf.c | 26 +++++++++++++++++++++++++-
+ 1 file changed, 25 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/gpu/drm/exynos/exynos_drm_dmabuf.c b/drivers/gpu/drm/exynos/exynos_drm_dmabuf.c
+index 2a3ad24..739f593 100644
+--- a/drivers/gpu/drm/exynos/exynos_drm_dmabuf.c
++++ b/drivers/gpu/drm/exynos/exynos_drm_dmabuf.c
+@@ -165,7 +165,31 @@ static void exynos_gem_dmabuf_kunmap(struct dma_buf *dma_buf,
+ static int exynos_gem_dmabuf_mmap(struct dma_buf *dma_buf,
+ 	struct vm_area_struct *vma)
+ {
+-	return -ENOTTY;
++	struct exynos_drm_gem_obj *exynos_gem_obj = dma_buf->priv;
++	struct exynos_drm_gem_buf *buffer = exynos_gem_obj->buffer;
++	unsigned long uaddr = vma->vm_start;
++	int ret;
++
++	if (exynos_gem_obj->flags & EXYNOS_BO_NONCONTIG) {
++		unsigned long i = 0;
++		struct scatterlist *sgl;
++
++		if (!buffer->sgt)
++			return -EINVAL;
++		sgl = buffer->sgt->sgl;
++
++		while (i < buffer->sgt->nents) {
++			ret = vm_insert_page(vma, uaddr, sg_page(sgl));
++			if (ret) {
++				DRM_ERROR("failed to remap user space.\n");
++				return ret;
++			}
++			sgl = sg_next(sgl);
++			uaddr += PAGE_SIZE;
++			i++;
++		}
++	}
++	return 0;
+ }
+ 
+ static struct dma_buf_ops exynos_dmabuf_ops = {
+-- 
+1.9.1
+
