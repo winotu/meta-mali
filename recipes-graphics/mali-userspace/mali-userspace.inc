@@ -40,3 +40,7 @@ do_install () {
 PACKAGES = "${PN}"
 FILES_${PN} += "${sysconfdir}/MALI_MANIFEST \
 		${libdir}/*.so "
+
+RREPLACES_${PN} = "libegl libegl1 libgles1 libglesv1-cm1 libgles2 libglesv2-2 libopencl"
+RPROVIDES_${PN} = "libegl libegl1 libgles1 libglesv1-cm1 libgles2 libglesv2-2 libopencl"
+RCONFLICTS_${PN} = "libegl libegl1 libgles1 libglesv1-cm1 libgles2 libglesv2-2 libopencl"
