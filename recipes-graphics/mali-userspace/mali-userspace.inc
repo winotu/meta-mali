@@ -1,7 +1,7 @@
 LICENSE = "Proprietary"
 SECTION = "libs"
 
-PROVIDES += "virtual/egl virtual/gles1 virtual/gles2 virtual/opencl"
+PROVIDES += "virtual/egl virtual/libgles1 virtual/libgles2 virtual/libopencl"
 
 S = "${WORKDIR}"
 
