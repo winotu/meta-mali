@@ -14,8 +14,6 @@ INSANE_SKIP_${PN} = "ldflags dev-so"
 INHIBIT_PACKAGE_DEBUG_SPLIT = "1"
 INHIBIT_PACKAGE_STRIP = "1"
 
-inherit mali_eula_unpack
-
 USE_X11 = "${@base_contains("DISTRO_FEATURES", "x11", "yes", "no", d)}"
 USE_DFB = "${@base_contains("DISTRO_FEATURES", "directfb", "yes", "no", d)}"
 USE_WL = "${@base_contains("DISTRO_FEATURES", "wayland", "yes", "no", d)}"

@@ -79,11 +79,6 @@ To add the user-side binary to your build, add this line to local.conf:
 
     IMAGE_INSTALL_append = " mali-userspace-t62x"
 
-To show that you have read and accepted the terms of the EULA and
-enable the recipes, add this line to local.conf:
-
-    ACCEPT_MALI_EULA = "1"
-
 Because the Mali recipes provide EGL and OpenGL ES but not OpenGL,
 there is a conflict with the Mesa recipes which are needed for X11 and
 Wayland.  So the current Mali GPU support in OE does not work with
