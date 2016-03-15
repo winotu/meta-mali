@@ -21,6 +21,8 @@ OpenEmbedded set-up
 
 * Set MACHINE to odroidxu3 in openembedded-core/build/conf/local.conf
 
+* Add DEFAULTTUNE = "armv7athf" to openembedded-core/build/conf/local.conf
+
 Yocto/Poky set-up
 -----------------
 
@@ -33,6 +35,8 @@ Yocto/Poky set-up
 * Add path to meta-mali in poky/build/conf/bblayers.conf
 
 * Set MACHINE to odroidxu3 in poky/build/conf/local.conf
+
+* Add DEFAULTTUNE = "armv7athf" to poky/build/conf/local.conf
 
 Building
 --------
